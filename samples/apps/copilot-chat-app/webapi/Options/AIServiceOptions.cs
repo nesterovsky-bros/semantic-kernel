@@ -35,8 +35,12 @@ public sealed class AIServiceOptions
         /// <summary>
         /// Azure OpenAI deployment name or OpenAI model name to use for completions.
         /// </summary>
-        [Required, NotEmptyOrWhitespace]
         public string Completion { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Azure OpenAI deployment name or OpenAI model name to use for completions.
+        /// </summary>
+        public string TextCompletion { get; set; } = string.Empty;
 
         /// <summary>
         /// Azure OpenAI deployment name or OpenAI model name to use for embeddings.

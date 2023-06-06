@@ -305,69 +305,59 @@ public class QASkill
                 new ProposedPlan(this._externalInformationSkill.ProposedPlan));
         }
 
-        // 4. Query relevant semantic memories
-        var chatMemoriesTokenLimit = (int)(remainingToken * this._promptOptions.MemoriesResponseContextWeight);
-        var chatMemories = await this.QueryChatMemoriesAsync(chatContext, userIntent, chatMemoriesTokenLimit);
-        if (chatContext.ErrorOccurred)
-        {
-            return string.Empty;
-        }
-
-        // 5. Query relevant document memories
+        // Get document prompts.
         var documentContextTokenLimit = (int)(remainingToken * this._promptOptions.DocumentContextWeight);
-        var documentMemories = await this.QueryDocumentsAsync(chatContext, userIntent, documentContextTokenLimit);
-        if (chatContext.ErrorOccurred)
+        var documentPrompts = await this.QueryDocumentsAsync(chatContext, userIntent, documentContextTokenLimit);
+
+        if (documentPrompts.Count == 0)
         {
-            return string.Empty;
+            return "";
         }
 
-        // 6. Fill in the chat history if there is any token budget left
-        var chatContextComponents = new List<string>()
+        async Task<string> completePrompt(string documentPrompt)
         {
-            //chatMemories,
-            documentMemories,
-            planResult
-        };
-        var chatContextText = string.Join("\n\n", chatContextComponents.Where(c => !string.IsNullOrEmpty(c)));
-        //var chatContextTextTokenCount = remainingToken - Utilities.TokenCount(chatContextText);
-        //if (chatContextTextTokenCount > 0)
-        //{
-        //    var chatHistory = await this.GetChatHistoryAsync(chatContext, chatContextTextTokenCount);
-        //    if (chatContext.ErrorOccurred)
-        //    {
-        //        return string.Empty;
-        //    }
-        //    chatContextText = $"{chatContextText}\n{chatHistory}";
-        //}
+            // 6. Fill in the chat history if there is any token budget left
+            var chatContextComponents = new List<string?>()
+            {
+                documentPrompt,
+                planResult
+            };
 
-        // Invoke the model
-        chatContext.Variables.Set("UserIntent", userIntent);
-        chatContext.Variables.Set("ChatContext", chatContextText);
+            var chatContextText = string.Join("\n\n", chatContextComponents.Where(c => !string.IsNullOrEmpty(c)));
 
-        var promptRenderer = new PromptTemplateEngine();
-        var renderedPrompt = await promptRenderer.RenderAsync(
-            this._promptOptions.SystemChatPrompt,
-            chatContext);
+            // Invoke the model
+            chatContext.Variables.Set("UserIntent", userIntent!);
+            chatContext.Variables.Set("ChatContext", chatContextText);
 
-        var completionFunction = this._kernel.CreateSemanticFunction(
-            renderedPrompt,
-            skillName: nameof(QASkill),
-            description: "Complete the prompt.");
+            var promptRenderer = new PromptTemplateEngine();
+            var renderedPrompt = await promptRenderer.RenderAsync(
+                this._promptOptions.SystemChatPrompt,
+                chatContext);
 
-        chatContext = await completionFunction.InvokeAsync(
-            context: chatContext,
-            settings: this.CreateChatResponseCompletionSettings()
-        );
+            var completionFunction = this._kernel.CreateSemanticFunction(
+                renderedPrompt,
+                skillName: nameof(QASkill),
+                description: "Complete the prompt.");
 
-        // Allow the caller to view the prompt used to generate the response
-        chatContext.Variables.Set("prompt", renderedPrompt);
+            chatContext = await completionFunction.InvokeAsync(
+                context: chatContext,
+                settings: this.CreateChatResponseCompletionSettings()
+            );
 
-        if (chatContext.ErrorOccurred)
-        {
-            return string.Empty;
+            // Allow the caller to view the prompt used to generate the response
+            chatContext.Variables.Set("prompt", renderedPrompt);
+
+            if (chatContext.ErrorOccurred)
+            {
+                return string.Empty;
+            }
+
+            return chatContext.Result;
         }
 
-        return chatContext.Result;
+        var results = await Task.WhenAll(documentPrompts.Select(completePrompt));
+
+        return string.Join("/n/n", results);
     }
 
     /// <summary>
@@ -463,7 +453,7 @@ public class QASkill
     /// Helper function create the correct context variables to
     /// query document memories from the document memory store.
     /// </summary>
-    private Task<string> QueryDocumentsAsync(SKContext context, string userIntent, int tokenLimit)
+    private async Task<List<string>> QueryDocumentsAsync(SKContext context, string userIntent, int tokenLimit)
     {
         var contextVariables = new ContextVariables();
         contextVariables.Set("chatId", context["chatId"]);
@@ -477,15 +467,24 @@ public class QASkill
             context.CancellationToken
         );
 
-        var documentMemories = this._documentMemorySkill.QueryDocumentsAsync(userIntent, documentMemoriesContext);
+        var memories = await this._documentMemorySkill.QueryDocumentMemoriesAsync(userIntent, documentMemoriesContext);
 
-        // Propagate the error
-        if (documentMemoriesContext.ErrorOccurred)
+        List<string> documentPrompts = new();
+
+        for (int i = 0; i < memories.Count;)
         {
-            context.Fail(documentMemoriesContext.LastErrorDescription);
+            var (prompt, count) = this._documentMemorySkill.QueryDocuments(memories.Skip(i), documentMemoriesContext);
+
+            if (count <= 0)
+            {
+                break;
+            }
+
+            i += count;
+            documentPrompts.Add(prompt);
         }
 
-        return documentMemories;
+        return documentPrompts;
     }
 
     /// <summary>

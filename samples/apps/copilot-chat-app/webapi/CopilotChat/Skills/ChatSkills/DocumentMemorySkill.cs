@@ -38,21 +38,9 @@ public class DocumentMemorySkill
         this._documentImportOptions = documentImportOptions.Value;
     }
 
-    /// <summary>
-    /// Query the document memory collection for documents that match the query.
-    /// </summary>
-    /// <param name="query">Query to match.</param>
-    /// <param name="context">The SkContext.</param>
-    [SKFunction("Query documents in the memory given a user message")]
-    [SKFunctionName("QueryDocuments")]
-    [SKFunctionInput(Description = "Query to match.")]
-    [SKFunctionContextParameter(Name = "chatId", Description = "ID of the chat that owns the documents")]
-    [SKFunctionContextParameter(Name = "tokenLimit", Description = "Maximum number of tokens")]
-    public async Task<string> QueryDocumentsAsync(string query, SKContext context)
+    public async Task<List<MemoryQueryResult>> QueryDocumentMemoriesAsync(string query, SKContext context)
     {
         string chatId = context.Variables["chatId"];
-        int tokenLimit = int.Parse(context.Variables["tokenLimit"], new NumberFormatInfo());
-        var remainingToken = tokenLimit;
 
         // Search for relevant document snippets.
         string[] documentCollections = new string[]
@@ -77,15 +65,25 @@ public class DocumentMemorySkill
 
         relevantMemories = relevantMemories.OrderByDescending(m => m.Relevance).ToList();
 
+        return relevantMemories;
+    }
+
+    public (string prompt, int count) QueryDocuments(IEnumerable<MemoryQueryResult> memories, SKContext context)
+    {
+        int count = 0;
+        int tokenLimit = int.Parse(context.Variables["tokenLimit"], new NumberFormatInfo());
+        var remainingToken = tokenLimit;
+
         // Concatenate the relevant document snippets.
         string documentsText = string.Empty;
-        foreach (var memory in relevantMemories)
+        foreach (var memory in memories)
         {
             var tokenCount = Utilities.TokenCount(memory.Metadata.Text);
             if (remainingToken - tokenCount > 0)
             {
                 documentsText += $"\n\nSnippet from {memory.Metadata.Description}: {memory.Metadata.Text}";
                 remainingToken -= tokenCount;
+                ++count;
             }
             else
             {
@@ -96,9 +94,25 @@ public class DocumentMemorySkill
         if (string.IsNullOrEmpty(documentsText))
         {
             // No relevant documents found
-            return string.Empty;
+            return ("", 0);
         }
 
-        return $"User has also shared some document snippets:\n{documentsText}";
+        return ($"User has also shared some document snippets:\n{documentsText}", count);
+    }
+
+
+    /// <summary>
+    /// Query the document memory collection for documents that match the query.
+    /// </summary>
+    /// <param name="query">Query to match.</param>
+    /// <param name="context">The SkContext.</param>
+    [SKFunction("Query documents in the memory given a user message")]
+    [SKFunctionName("QueryDocuments")]
+    [SKFunctionInput(Description = "Query to match.")]
+    [SKFunctionContextParameter(Name = "chatId", Description = "ID of the chat that owns the documents")]
+    [SKFunctionContextParameter(Name = "tokenLimit", Description = "Maximum number of tokens")]
+    public async Task<string> QueryDocumentsAsync(string query, SKContext context)
+    {
+        return this.QueryDocuments(await this.QueryDocumentMemoriesAsync(query, context), context).prompt;
     }
 }
