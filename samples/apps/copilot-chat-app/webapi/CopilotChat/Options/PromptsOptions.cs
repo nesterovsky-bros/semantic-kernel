@@ -54,6 +54,8 @@ public class PromptsOptions
     /// </summary>
     internal double DocumentMemoryMinRelevance { get; } = 0.8;
 
+    public bool QA { get; set; } = false;
+
     // System
     [Required, NotEmptyOrWhitespace] public string KnowledgeCutoffDate { get; set; } = string.Empty;
     [Required, NotEmptyOrWhitespace] public string InitialBotMessage { get; set; } = string.Empty;
@@ -64,7 +66,7 @@ public class PromptsOptions
     {
         this.SystemDescription,
         this.SystemIntent,
-        "{{ChatSkill.ExtractChatHistory}}",
+        this.QA ? "{{QASkill.ExtractChatHistory}}" : "{{ChatSkill.ExtractChatHistory}}",
         this.SystemIntentContinuation
     };
 
@@ -90,7 +92,7 @@ public class PromptsOptions
         $"{this.LongTermMemoryName} Description:\n{this.LongTermMemoryExtraction}",
         this.MemoryAntiHallucination,
         $"Chat Description:\n{this.SystemDescription}",
-        "{{ChatSkill.ExtractChatHistory}}",
+        this.QA ? "{{QASkill.ExtractChatHistory}}" : "{{ChatSkill.ExtractChatHistory}}",
         this.MemoryContinuation
     };
 
@@ -106,7 +108,7 @@ public class PromptsOptions
         $"{this.WorkingMemoryName} Description:\n{this.WorkingMemoryExtraction}",
         this.MemoryAntiHallucination,
         $"Chat Description:\n{this.SystemDescription}",
-        "{{ChatSkill.ExtractChatHistory}}",
+        this.QA ? "{{QASkill.ExtractChatHistory}}" : "{{ChatSkill.ExtractChatHistory}}",
         this.MemoryContinuation
     };
 

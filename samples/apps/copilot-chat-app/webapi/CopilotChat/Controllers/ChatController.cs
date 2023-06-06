@@ -35,7 +35,7 @@ public class ChatController : ControllerBase, IDisposable
 {
     private readonly ILogger<ChatController> _logger;
     private readonly List<IDisposable> _disposables;
-    private const string ChatSkillName = "ChatSkill";
+    private const string ChatSkillName = "QASkill";
     private const string ChatFunctionName = "Chat";
 
     public ChatController(ILogger<ChatController> logger)

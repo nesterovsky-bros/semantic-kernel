@@ -21,7 +21,7 @@ using SemanticKernel.Service.CopilotChat.Storage;
 namespace SemanticKernel.Service.CopilotChat.Skills.ChatSkills;
 
 /// <summary>
-/// ChatSkill offers a more coherent chat experience by using memories
+/// QASkill offers a more coherent chat experience by using memories
 /// to extract conversation history and user intentions.
 /// </summary>
 public class QASkill
@@ -63,7 +63,7 @@ public class QASkill
     private readonly ExternalInformationSkill _externalInformationSkill;
 
     /// <summary>
-    /// Create a new instance of <see cref="ChatSkill"/>.
+    /// Create a new instance of <see cref="QASkill"/>.
     /// </summary>
     public QASkill(
         IKernel kernel,
@@ -118,7 +118,7 @@ public class QASkill
 
         var completionFunction = this._kernel.CreateSemanticFunction(
             this._promptOptions.SystemIntentExtraction,
-            skillName: nameof(ChatSkill),
+            skillName: nameof(QASkill),
             description: "Complete the prompt.");
 
         var result = await completionFunction.InvokeAsync(
@@ -351,7 +351,7 @@ public class QASkill
 
         var completionFunction = this._kernel.CreateSemanticFunction(
             renderedPrompt,
-            skillName: nameof(ChatSkill),
+            skillName: nameof(QASkill),
             description: "Complete the prompt.");
 
         chatContext = await completionFunction.InvokeAsync(
