@@ -70,6 +70,9 @@ internal static class SemanticKernelExtensions
         // Time skill
         kernel.ImportSkill(new TimeSkill(), nameof(TimeSkill));
 
+        // Summarize skill
+        kernel.ImportSkill(new ConversationSummarySkill(kernel));
+
         // Semantic skills
         ServiceOptions options = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
         if (!string.IsNullOrWhiteSpace(options.SemanticSkillsDirectory))
