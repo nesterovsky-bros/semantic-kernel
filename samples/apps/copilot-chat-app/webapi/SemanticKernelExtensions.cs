@@ -159,7 +159,8 @@ internal static class SemanticKernelExtensions
             AIServiceOptions.AIServiceType.AzureOpenAI
                 => kernelBuilder.WithAzureChatCompletionService(options.Models.Completion, options.Endpoint, options.Key),
             AIServiceOptions.AIServiceType.OpenAI
-                => kernelBuilder.WithOpenAIChatCompletionService(options.Models.Completion, options.Key),
+                //=> kernelBuilder.WithOpenAIChatCompletionService(options.Models.Completion, options.Key),
+                => kernelBuilder.WithOpenAITextCompletionService(options.Models.Completion, options.Key),
             _
                 => throw new ArgumentException($"Invalid {nameof(options.Type)} value in '{AIServiceOptions.PropertyName}' settings."),
         };

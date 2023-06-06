@@ -39,15 +39,15 @@ public static class CopilotChatSemanticKernelExtensions
     public static IKernel RegisterCopilotChatSkills(this IKernel kernel, IServiceProvider sp)
     {
         // Chat skill
-        kernel.ImportSkill(new ChatSkill(
+        kernel.ImportSkill(new QASkill(
                 kernel: kernel,
                 chatMessageRepository: sp.GetRequiredService<ChatMessageRepository>(),
                 chatSessionRepository: sp.GetRequiredService<ChatSessionRepository>(),
                 promptOptions: sp.GetRequiredService<IOptions<PromptsOptions>>(),
                 documentImportOptions: sp.GetRequiredService<IOptions<DocumentMemoryOptions>>(),
                 planner: sp.GetRequiredService<CopilotChatPlanner>(),
-                logger: sp.GetRequiredService<ILogger<ChatSkill>>()),
-            nameof(ChatSkill));
+                logger: sp.GetRequiredService<ILogger<QASkill>>()),
+            nameof(QASkill));
 
         return kernel;
     }
