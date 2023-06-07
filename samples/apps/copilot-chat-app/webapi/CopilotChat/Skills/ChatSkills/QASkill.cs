@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.AI.TextCompletion;
+using Microsoft.SemanticKernel.CoreSkills;
 using Microsoft.SemanticKernel.Orchestration;
 using Microsoft.SemanticKernel.SkillDefinition;
 using Microsoft.SemanticKernel.TemplateEngine;
@@ -356,8 +357,11 @@ public class QASkill
         }
 
         var results = await Task.WhenAll(documentPrompts.Select(completePrompt));
+        var transcript = string.Join("\n\n", results.Select(text => "bot: " + text));
+        var summaryFn = this._kernel.Skills.GetFunction("SummarizeConversation");
+        var summaryContext = await this._kernel.RunAsync(transcript, summaryFn);
 
-        return string.Join("/n/n", results);
+        return summaryContext.Result;
     }
 
     /// <summary>
