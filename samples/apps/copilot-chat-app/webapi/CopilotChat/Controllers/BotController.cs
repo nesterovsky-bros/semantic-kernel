@@ -135,6 +135,7 @@ public class BotController : ControllerBase
 
         // 3. Update the memory.
         await this.BulkUpsertMemoryRecordsAsync(oldChatId, chatId, bot.Embeddings, cancellationToken);
+        await this.BulkUpsertMemoryRecordsAsync(oldChatId, chatId, bot.DocumentEmbeddings, cancellationToken);
 
         // TODO: Revert changes if any of the actions failed
 
@@ -311,6 +312,7 @@ public class BotController : ControllerBase
                             collection: newCollectionName,
                             text: record.Metadata.Text,
                             id: record.Metadata.Id,
+                            description: record.Metadata.Description,
                             cancellationToken: cancellationToken);
                     }
                     else
@@ -319,7 +321,7 @@ public class BotController : ControllerBase
                             id: record.Metadata.Id,
                             text: record.Metadata.Text,
                             embedding: record.Embedding.Value,
-                            description: null,
+                            description: record.Metadata.Description,
                             additionalMetadata: null);
 
                         if (!(await this._memoryStore.DoesCollectionExistAsync(newCollectionName, default)))
