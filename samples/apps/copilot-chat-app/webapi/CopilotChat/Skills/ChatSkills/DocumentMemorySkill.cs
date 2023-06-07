@@ -79,9 +79,10 @@ public class DocumentMemorySkill
         foreach (var memory in memories)
         {
             var tokenCount = Utilities.TokenCount(memory.Metadata.Text);
+
             if (remainingToken - tokenCount > 0)
             {
-                documentsText += $"\n\nSnippet from {memory.Metadata.Description}: {memory.Metadata.Text}";
+                documentsText += $"\n\n* from {memory.Metadata.Description}: {memory.Metadata.Text}";
                 remainingToken -= tokenCount;
                 ++count;
             }

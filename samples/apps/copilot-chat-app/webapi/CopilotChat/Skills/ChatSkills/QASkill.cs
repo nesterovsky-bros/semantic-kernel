@@ -260,12 +260,12 @@ public class QASkill
             return context;
         }
 
-        // Extract semantic chat memory
-        await SemanticChatMemoryExtractor.ExtractSemanticChatMemoryAsync(
-            chatId,
-            this._kernel,
-            chatContext,
-            this._promptOptions);
+        //// Extract semantic chat memory
+        //await SemanticChatMemoryExtractor.ExtractSemanticChatMemoryAsync(
+        //    chatId,
+        //    this._kernel,
+        //    chatContext,
+        //    this._promptOptions);
 
         context.Variables.Update(response);
         context.Variables.Set("userId", "Bot");
@@ -357,8 +357,16 @@ public class QASkill
         }
 
         var results = await Task.WhenAll(documentPrompts.Select(completePrompt));
-        var transcript = string.Join("\n\n", results.Select(text => "bot: " + text));
-        var summaryFn = this._kernel.Skills.GetFunction("SummarizeConversation");
+
+        if (results.Length == 1)
+        {
+            return results[0];
+        }
+
+        var transcript = userIntent + "\n\n" +
+            string.Join("\n\n", results);
+
+        var summaryFn = this._kernel.Func("customSkill", "SummarizeConversation");
         var summaryContext = await this._kernel.RunAsync(transcript, summaryFn);
 
         return summaryContext.Result;

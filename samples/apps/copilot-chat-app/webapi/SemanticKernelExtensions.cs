@@ -16,6 +16,7 @@ using Microsoft.SemanticKernel.CoreSkills;
 using Microsoft.SemanticKernel.Memory;
 using Microsoft.SemanticKernel.TemplateEngine;
 using SemanticKernel.Service.CopilotChat.Extensions;
+using SemanticKernel.Service.CopilotChat.Skills.Custom;
 using SemanticKernel.Service.CopilotChat.Storage;
 using SemanticKernel.Service.Options;
 
@@ -71,7 +72,7 @@ internal static class SemanticKernelExtensions
         kernel.ImportSkill(new TimeSkill(), nameof(TimeSkill));
 
         // Summarize skill
-        kernel.ImportSkill(new ConversationSummarySkill(kernel));
+        kernel.ImportSkill(new SummarySkill(kernel), "customSkill");
 
         // Semantic skills
         ServiceOptions options = sp.GetRequiredService<IOptions<ServiceOptions>>().Value;
