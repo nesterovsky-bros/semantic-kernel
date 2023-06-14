@@ -165,8 +165,12 @@ public class BotController : ControllerBase
     {
         this._logger.LogDebug("Received call to download a bot");
         var memory = await this.CreateBotAsync(kernel: kernel, chatId: chatId);
+        var options = new JsonSerializerOptions()
+        {
+            WriteIndented = true
+        };
 
-        return JsonSerializer.Serialize(memory);
+        return JsonSerializer.Serialize(memory, options);
     }
 
     /// <summary>
