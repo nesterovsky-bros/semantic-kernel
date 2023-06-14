@@ -101,7 +101,7 @@ public abstract class ClientBase
         var result = new List<Embedding<float>>();
         foreach (string text in data)
         {
-            var options = new EmbeddingsOptions(text);
+            var options = new EmbeddingsOptions(text.Replace("\r\n", " ").Replace('\n', ' '));
 
             Response<Embeddings>? response = await RunRequestAsync<Response<Embeddings>?>(
                 () => this.Client.GetEmbeddingsAsync(this.ModelId, options, cancellationToken)).ConfigureAwait(false);

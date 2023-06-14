@@ -1,8 +1,10 @@
 ﻿// Copyright (c) Microsoft. All rights reserved.
 
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -16,6 +18,8 @@ using SemanticKernel.Service.CopilotChat.Options;
 using SemanticKernel.Service.CopilotChat.Storage;
 using UglyToad.PdfPig;
 using UglyToad.PdfPig.DocumentLayoutAnalysis.TextExtractor;
+using static System.Net.Mime.MediaTypeNames;
+using static UglyToad.PdfPig.Core.PdfSubpath;
 
 namespace SemanticKernel.Service.CopilotChat.Controllers;
 
@@ -110,7 +114,7 @@ public class DocumentImportController : ControllerBase
                     return this.BadRequest($"Unsupported file type: {fileType}");
             }
 
-            await this.ParseDocumentContentToMemoryAsync(kernel, fileContent, documentImportForm);
+            await this.ParseDocumentContentToMemoryAsync(kernel, fileContent, documentImportForm, true);
         }
         catch (Exception ex) when (ex is ArgumentOutOfRangeException)
         {
@@ -145,7 +149,9 @@ public class DocumentImportController : ControllerBase
     private async Task<string> ReadTxtFileAsync(IFormFile file)
     {
         using var streamReader = new StreamReader(file.OpenReadStream());
-        return await streamReader.ReadToEndAsync();
+        var text = await streamReader.ReadToEndAsync();
+
+        return text.Replace("\r\n\r\n", "\f");
     }
 
     /// <summary>
@@ -161,7 +167,7 @@ public class DocumentImportController : ControllerBase
         foreach (var page in pdfDocument.GetPages())
         {
             var text = ContentOrderTextExtractor.GetText(page);
-            fileContent += text;
+            fileContent += text.Replace("\n\n", "\f").Replace("\r\n\r\n", "\f") + '\f';
         }
 
         return fileContent;
@@ -174,7 +180,7 @@ public class DocumentImportController : ControllerBase
     /// <param name="content">The file content read from the uploaded document</param>
     /// <param name="documentImportForm">The document upload form that contains additional necessary info</param>
     /// <returns></returns>
-    private async Task ParseDocumentContentToMemoryAsync(IKernel kernel, string content, DocumentImportForm documentImportForm)
+    private async Task ParseDocumentContentToMemoryAsync(IKernel kernel, string content, DocumentImportForm documentImportForm, bool splitByPage = false)
     {
         var documentName = Path.GetFileName(documentImportForm.FormFile?.FileName);
         var targetCollectionName = documentImportForm.DocumentScope == DocumentImportForm.DocumentScopes.Global
@@ -182,9 +188,14 @@ public class DocumentImportController : ControllerBase
             : this._options.ChatDocumentCollectionNamePrefix + documentImportForm.ChatId;
 
         // Split the document into lines of text and then combine them into paragraphs.
-        // Note that this is only one of many strategies to chunk documents. Feel free to experiment with other strategies.
-        var lines = TextChunker.SplitPlainTextLines(content, this._options.DocumentLineSplitMaxTokens);
-        var paragraphs = TextChunker.SplitPlainTextParagraphs(lines, this._options.DocumentParagraphSplitMaxLines);
+        // Note that this is only one of many strategies to chunk documents.
+        // Feel free to experiment with other strategies.
+        var paragraphs = splitByPage ?
+            SplitByPage(content,
+                this._options.DocumentParagraphSplitMaxLines * this._options.DocumentLineSplitMaxTokens) :
+            TextChunker.SplitPlainTextParagraphs(
+                TextChunker.SplitPlainTextLines(content.Replace('\f', '\n'), this._options.DocumentLineSplitMaxTokens),
+                this._options.DocumentParagraphSplitMaxLines);
 
         foreach (var paragraph in paragraphs)
         {
@@ -200,6 +211,91 @@ public class DocumentImportController : ControllerBase
             paragraphs.Count,
             Path.GetFileName(documentImportForm.FormFile?.FileName)
         );
+    }
+
+    private List<string> SplitByPage(string content, int maxTokens)
+    {
+        var pages = new List<string>();
+
+        if (!string.IsNullOrWhiteSpace(content))
+        {
+            var count = this.encoding.GetByteCount(content);
+            var totalTokens = (count / 3.0 + ((count % 3 != 0) ? 1 : 0));
+            var avgTokenPerChar = totalTokens / content.Length;
+            var maxLength = (int)((maxTokens - 1) / avgTokenPerChar);
+            int i = 0, c = content.Length, len = 0;
+
+            while (i < c)
+            {
+                if (len >= maxLength)
+                {
+                    for (int j = i, s = i - len; j >= s; j--)
+                    {
+                        var chr = content[j];
+
+                        if ((chr == '.') || (chr == '!') || (chr == '?'))
+                        {
+                            var page = content.AsSpan(i - len, j + 1).Trim().ToString();
+
+                            if (page.Length > 0)
+                            {
+                                pages.Add(page);
+                            }
+
+                            len = 0;
+
+                            i = j;
+
+                            break;
+                        }
+                    }
+
+                    if (len > 0)
+                    {
+                        var page = content.AsSpan(i - len, len - 1).Trim().ToString();
+
+                        if (page.Length > 0)
+                        {
+                            pages.Add(page);
+                        }
+
+                        len = 0;
+                    }
+                }
+                else if (content[i] == '\f')
+                {
+                    if (len != 0)
+                    {
+                        var page = content.AsSpan(i - len, len).Trim().ToString();
+
+                        if (page.Length > 0)
+                        {
+                            pages.Add(page);
+                        }
+
+                        len = 0;
+                    }
+                }
+                else
+                {
+                    len++;
+                }
+
+                i++;
+            }
+        }
+
+        return pages;
+    }
+
+    private UTF8Encoding encoding = new();
+
+    private int CountTokens(string text)
+    {
+        var count =
+            string.IsNullOrWhiteSpace(text) ? 0 : this.encoding.GetByteCount(text);
+
+        return count == 0 ? 0 : (count / 3 + ((count % 3 != 0) ? 1 : 0));
     }
 
     /// <summary>
